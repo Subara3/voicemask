@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>voicemask 見本</title>
+<style>
+:root { --bg:#fff; --fg:#222; --sub:#666; --line:#ddd; --mark:#ffe08a; --m:#555; }
+@media (prefers-color-scheme: dark) { :root { --bg:#16181b; --fg:#e6e6e6; --sub:#9a9a9a; --line:#333; --mark:#6b5a1e; --m:#bbb; } }
+body { background:var(--bg); color:var(--fg); font-family:system-ui,"Hiragino Sans","Yu Gothic UI",sans-serif; margin:0; padding:24px 16px; line-height:1.7; }
+main { max-width:1000px; margin:0 auto; }
+h1 { font-size:1.4rem; margin:0 0 4px; } h2 { font-size:1.1rem; margin:32px 0 4px; }
+.lead, .meta { color:var(--sub); font-size:.9rem; margin:0 0 8px; }
+.players { display:flex; flex-wrap:wrap; gap:12px 24px; margin:8px 0 12px; }
+.players label { display:flex; flex-direction:column; font-size:.85rem; color:var(--sub); }
+audio { width:min(420px, 92vw); }
+table { width:100%; border-collapse:collapse; font-size:.92rem; }
+th, td { border-top:1px solid var(--line); padding:6px 8px; vertical-align:top; text-align:left; }
+th { font-weight:600; color:var(--sub); font-size:.8rem; }
+td.t { width:4.5em; } td.t button { font:inherit; font-size:.8rem; color:var(--sub); background:none; border:1px solid var(--line); border-radius:4px; cursor:pointer; padding:0 6px; }
+mark { background:var(--mark); color:inherit; } .m { color:var(--m); font-size:.85em; }
+@media (max-width:640px) { thead { display:none; } tr { display:block; border-top:1px solid var(--line); padding:4px 0; } td { display:block; border:0; padding:2px 0; } }
+</style></head>
+<body><main>
+<h1>voicemask 見本</h1>
+<p class="lead">合成した通話（人名・住所・番号はすべて架空）を AmiVoice（会話_汎用、ログ保存なし）で認識し、個人情報の語を文字と音声の両方で伏せた例です。伏せた区間はピー音に置き換えています。時刻のボタンを押すと、両方の音声がその位置に移ります。</p>
+
+<section class="call" id="call0102">
+  <h2>call0102：住所の変更</h2>
+  <p class="meta">個人情報 5件のうち、音声の9割以上を伏せたもの 5件</p>
+  <div class="players">
+    <label>伏せる前<audio controls preload="none" src="audio/call0102_before.mp3"></audio></label>
+    <label>伏せた後<audio controls preload="none" src="audio/call0102_after.mp3"></audio></label>
+  </div>
+  <table><thead><tr><th></th><th>認識した文字（伏せる語に色）</th><th>残す文字</th></tr></thead>
+  <tbody><tr><td class="t"><button data-t="0.36">00:00</button></td><td>お待たせいたしました。</td><td>お待たせいたしました。</td></tr><tr><td class="t"><button data-t="2.10">00:02</button></td><td>お客様窓口でございます。</td><td>お客様窓口でございます。</td></tr><tr><td class="t"><button data-t="4.24">00:04</button></td><td>引っ越したので、住所の変更をお願いしたいんですがご契約者様のお名前を伺えますでしょうか？はい。<mark>伊藤</mark><mark>翼</mark>と申します。</td><td>引っ越したので、住所の変更をお願いしたいんですがご契約者様のお名前を伺えますでしょうか？はい。<span class="m">［伏］</span>と申します。</td></tr><tr><td class="t"><button data-t="14.46">00:14</button></td><td><mark>伊藤</mark>様ですね。</td><td><span class="m">［伏］</span>様ですね。</td></tr><tr><td class="t"><button data-t="16.22">00:16</button></td><td>ご本人確認のため生年月日をお願いいたします。</td><td>ご本人確認のため生年月日をお願いいたします。</td></tr><tr><td class="t"><button data-t="20.27">00:20</button></td><td><mark>1970</mark><mark>年</mark><mark>12月</mark><mark>25日</mark>です。</td><td><span class="m">［伏］</span>です。</td></tr><tr><td class="t"><button data-t="24.68">00:24</button></td><td>確認が取れました。ありがとうございます。</td><td>確認が取れました。ありがとうございます。</td></tr><tr><td class="t"><button data-t="27.31">00:27</button></td><td>新しいご住所を郵便番号からお願いいたします。</td><td>新しいご住所を郵便番号からお願いいたします。</td></tr><tr><td class="t"><button data-t="31.29">00:31</button></td><td><mark>4</mark><mark>1</mark><mark>5</mark><mark>-</mark><mark>1</mark><mark>8</mark><mark>6</mark><mark>8</mark>の<mark>北海道</mark><mark>旭川</mark><mark>市</mark><mark>神楽</mark><mark>2</mark><mark>丁目</mark><mark>19番</mark><mark>18</mark><mark>号</mark>です。</td><td><span class="m">［伏］</span>の<span class="m">［伏］</span>です。</td></tr><tr><td class="t"><button data-t="40.11">00:40</button></td><td>6月16日から新しいご住所に切り替わります。</td><td>6月16日から新しいご住所に切り替わります。</td></tr><tr><td class="t"><button data-t="44.17">00:44</button></td><td>他にご不明な点はございますか。</td><td>他にご不明な点はございますか。</td></tr><tr><td class="t"><button data-t="46.79">00:46</button></td><td>大丈夫です。ありがとうございました。</td><td>大丈夫です。ありがとうございました。</td></tr></tbody></table>
+</section>
+<section class="call" id="call0103">
+  <h2>call0103：カードの紛失</h2>
+  <p class="meta">個人情報 5件のうち、音声の9割以上を伏せたもの 5件</p>
+  <div class="players">
+    <label>伏せる前<audio controls preload="none" src="audio/call0103_before.mp3"></audio></label>
+    <label>伏せた後<audio controls preload="none" src="audio/call0103_after.mp3"></audio></label>
+  </div>
+  <table><thead><tr><th></th><th>認識した文字（伏せる語に色）</th><th>残す文字</th></tr></thead>
+  <tbody><tr><td class="t"><button data-t="0.28">00:00</button></td><td>お電話ありがとうございます。</td><td>お電話ありがとうございます。</td></tr><tr><td class="t"><button data-t="2.23">00:02</button></td><td>サポートセンターでございます。</td><td>サポートセンターでございます。</td></tr><tr><td class="t"><button data-t="4.17">00:04</button></td><td>クレジットカードをなくしてしまって止めて欲しいんです。</td><td>クレジットカードをなくしてしまって止めて欲しいんです。</td></tr><tr><td class="t"><button data-t="8.83">00:08</button></td><td>お客様のお名前をフルネームでお願いいたします。</td><td>お客様のお名前をフルネームでお願いいたします。</td></tr><tr><td class="t"><button data-t="12.97">00:12</button></td><td><mark>小川</mark><mark>智也</mark>です。</td><td><span class="m">［伏］</span>です。</td></tr><tr><td class="t"><button data-t="15.28">00:15</button></td><td><mark>小川</mark>様ですね。</td><td><span class="m">［伏］</span>様ですね。</td></tr><tr><td class="t"><button data-t="16.78">00:16</button></td><td>ご本人確認のため生年月日をお願いいたします。</td><td>ご本人確認のため生年月日をお願いいたします。</td></tr><tr><td class="t"><button data-t="20.53">00:20</button></td><td><mark>1984年</mark><mark>7月</mark><mark>6日</mark>です。</td><td><span class="m">［伏］</span>です。</td></tr><tr><td class="t"><button data-t="24.99">00:24</button></td><td>お手元にカード番号の控えはございますか。</td><td>お手元にカード番号の控えはございますか。</td></tr><tr><td class="t"><button data-t="28.26">00:28</button></td><td><mark>控え</mark>が<mark>あり</mark>ます。<mark>4</mark><mark>2</mark><mark>6</mark><mark>4</mark><mark>4</mark><mark>5</mark><mark>2</mark><mark>7</mark><mark>4</mark><mark>3</mark><mark>6</mark><mark>8</mark><mark>0</mark><mark>4</mark><mark>3</mark><mark>1</mark>です。</td><td><span class="m">［伏］</span>が<span class="m">［伏］</span>ます。<span class="m">［伏］</span>です。</td></tr><tr><td class="t"><button data-t="36.59">00:36</button></td><td>ただいま利用を停止しました。</td><td>ただいま利用を停止しました。</td></tr><tr><td class="t"><button data-t="38.91">00:38</button></td><td>新しいカードは5月23日頃にお届けします。</td><td>新しいカードは5月23日頃にお届けします。</td></tr><tr><td class="t"><button data-t="43.07">00:43</button></td><td>ご登録のお電話番号をお願いいたします。</td><td>ご登録のお電話番号をお願いいたします。</td></tr><tr><td class="t"><button data-t="46.09">00:46</button></td><td>携帯で<mark>0</mark><mark>9</mark><mark>0</mark><mark>-</mark><mark>6</mark><mark>6</mark><mark>4</mark><mark>0</mark><mark>-</mark><mark>1</mark><mark>4</mark><mark>5</mark><mark>9</mark>です。</td><td>携帯で<span class="m">［伏］</span>です。</td></tr><tr><td class="t"><button data-t="51.88">00:51</button></td><td>他にご不明な点はございますか。</td><td>他にご不明な点はございますか。</td></tr><tr><td class="t"><button data-t="54.47">00:54</button></td><td>大丈夫です。</td><td>大丈夫です。</td></tr><tr><td class="t"><button data-t="56.29">00:56</button></td><td>ありがとうございました。</td><td>ありがとうございました。</td></tr></tbody></table>
+</section>
+<section class="call" id="call0105">
+  <h2>call0105：会員情報の変更</h2>
+  <p class="meta">個人情報 5件のうち、音声の9割以上を伏せたもの 5件</p>
+  <div class="players">
+    <label>伏せる前<audio controls preload="none" src="audio/call0105_before.mp3"></audio></label>
+    <label>伏せた後<audio controls preload="none" src="audio/call0105_after.mp3"></audio></label>
+  </div>
+  <table><thead><tr><th></th><th>認識した文字（伏せる語に色）</th><th>残す文字</th></tr></thead>
+  <tbody><tr><td class="t"><button data-t="0.33">00:00</button></td><td>お電話ありがとうございます。</td><td>お電話ありがとうございます。</td></tr><tr><td class="t"><button data-t="2.69">00:02</button></td><td>サポートセンターでございます。</td><td>サポートセンターでございます。</td></tr><tr><td class="t"><button data-t="5.24">00:05</button></td><td>会員登録のメールアドレスを変えたいんです。</td><td>会員登録のメールアドレスを変えたいんです。</td></tr><tr><td class="t"><button data-t="8.99">00:08</button></td><td>ご契約者様のお名前を伺えますでしょうか？<mark>中村</mark><mark>陽子</mark>と申します。</td><td>ご契約者様のお名前を伺えますでしょうか？<span class="m">［伏］</span>と申します。</td></tr><tr><td class="t"><button data-t="16.45">00:16</button></td><td><mark>中村</mark>様ですね。</td><td><span class="m">［伏］</span>様ですね。</td></tr><tr><td class="t"><button data-t="18.63">00:18</button></td><td>ご本人確認のため生年月日をお願いいたします。</td><td>ご本人確認のため生年月日をお願いいたします。</td></tr><tr><td class="t"><button data-t="23.16">00:23</button></td><td><mark>1964年</mark><mark>2月</mark><mark>15日</mark>です。</td><td><span class="m">［伏］</span>です。</td></tr><tr><td class="t"><button data-t="28.24">00:28</button></td><td>新しいメールアドレスをお願いいたします<mark>I</mark><mark>O</mark><mark>K</mark><mark>O</mark>.</td><td>新しいメールアドレスをお願いいたします<span class="m">［伏］</span>.</td></tr><tr><td class="t"><button data-t="34.03">00:34</button></td><td><mark>N</mark><mark>A</mark><mark>K</mark><mark>M</mark><mark>U</mark><mark>R</mark><mark>A</mark><mark>A</mark><mark>@</mark><mark>example</mark>.</td><td><span class="m">［伏］</span>.</td></tr><tr><td class="t"><button data-t="41.23">00:41</button></td><td><mark>JP</mark>です。</td><td><span class="m">［伏］</span>です。</td></tr><tr><td class="t"><button data-t="43.37">00:43</button></td><td>ご登録のお電話番号をお願いいたします。</td><td>ご登録のお電話番号をお願いいたします。</td></tr><tr><td class="t"><button data-t="47.38">00:47</button></td><td><mark>0</mark><mark>8</mark><mark>0</mark><mark>-</mark><mark>9</mark><mark>7</mark><mark>5</mark><mark>8</mark><mark>-</mark><mark>6</mark><mark>1</mark><mark>9</mark><mark>8</mark>です。</td><td><span class="m">［伏］</span>です。</td></tr><tr><td class="t"><button data-t="52.89">00:52</button></td><td>確認が取れました。</td><td>確認が取れました。</td></tr><tr><td class="t"><button data-t="54.81">00:54</button></td><td>ありがとうございます。</td><td>ありがとうございます。</td></tr><tr><td class="t"><button data-t="56.75">00:56</button></td><td>他にご不明な点はございますか。</td><td>他にご不明な点はございますか。</td></tr><tr><td class="t"><button data-t="59.96">00:59</button></td><td>いいえ、以上です。</td><td>いいえ、以上です。</td></tr></tbody></table>
+</section>
+</main>
+<script>
+document.querySelectorAll('section.call').forEach(sec => {
+  const players = sec.querySelectorAll('audio');
+  sec.querySelectorAll('button[data-t]').forEach(b => b.addEventListener('click', () => {
+    players.forEach(p => { p.currentTime = parseFloat(b.dataset.t); });
+  }));
+});
+</script>
+</body></html>
