@@ -6,6 +6,7 @@ import argparse
 import csv
 import json
 import sys
+import time
 from pathlib import Path
 
 
@@ -205,39 +206,95 @@ def cmd_stream(a):
     from .synth import load_truths
 
     base = Path(a.truth).parent
-    for t in load_truths(a.truth, a.variant)[: a.limit]:
+    for t in load_truths(a.truth, a.variant)[a.start:][: a.limit or None]:
         out = Path(a.out) / f"{t.key}.json"
         if out.exists():
             continue
-        log = stream_file(base / t.audio_path, a.engine, a.chunk_ms, profile_words=_profile_words(a.profile_words))
+        log = None
+        for attempt in range(3):  # 接続の始めに切られることがある（11/10に1回）。送り直す
+            try:
+                log = stream_file(base / t.audio_path, a.engine, a.chunk_ms, profile_words=_profile_words(a.profile_words),
+                                  logging_opt_out=not a.with_log)
+                break
+            except Exception as e:  # noqa: BLE001
+                print(f"{t.key}: {attempt + 1}回目失敗（{type(e).__name__}: {e}）", flush=True)
+                time.sleep(10)
+        if log is None:
+            continue
         log.save(out)
         n = sum(1 for e in log.events if e["type"] == "final")
-        print(f"{t.key}: 確定結果 {n} 件、送り終わり {log.sent_done_ms:.0f}ms")
+        print(f"{t.key}: 確定結果 {n} 件、送り終わり {log.sent_done_ms:.0f}ms", flush=True)
 
 
 def cmd_stream_eval(a):
     from .asr import StreamLog, load_recognition
     from .evaluate import write_json
     from .mask import CONDITIONS, Detectors, with_threshold
-    from .stream_eval import decision_lags, segment_arrivals, simulate_arrivals, stream_leaks
+    from .stream_eval import decision_lags, partial_arrivals, segment_arrivals, simulate_arrivals, stream_leaks
     from .synth import load_truths
 
-    items = []
+    from .evaluate import trim_to_voice
+
+    items, cache = [], {}
+    base = Path(a.truth).parent
     for t in load_truths(a.truth, a.variant):
         p = Path(a.rec) / f"{t.key}.json"
         if not p.exists():
             continue
+        t = trim_to_voice(t, base, cache)
         if a.simulate:
             rec = load_recognition(p)
             items.append((t, rec, simulate_arrivals(rec)))
         else:
             log = StreamLog.load(p)
-            items.append((t, log.to_recognition(), segment_arrivals(log)))
+            rec = log.to_recognition()
+            items.append((t, rec, partial_arrivals(log, rec) if a.partial else segment_arrivals(log)))
     cfg = with_threshold(CONDITIONS[a.condition], a.threshold)
-    rows = stream_leaks(items, cfg, Detectors(cfg.base), [int(x) for x in a.delays.split(",")])
+    rows = stream_leaks(items, cfg, Detectors(cfg.base), [int(x) for x in a.delays.split(",")], use_partial=a.partial)
     res = {"確定までの遅れ": decision_lags(items), "ためる時間ごと": rows}
     write_json(res, Path(a.out) / "stream.json")
     print(json.dumps(res, ensure_ascii=False, indent=1))
+
+
+def cmd_live(a):
+    """録音ファイルを通話に見立てて実時間で流し、遅れて出てくる音声を伏せる。"""
+    from . import audio
+    from .live import run_live
+    from .mask import CONDITIONS, Detectors
+
+    cfg = CONDITIONS[a.condition]
+    out = Path(a.out)
+    out.mkdir(parents=True, exist_ok=True)
+    stem = Path(a.audio).stem
+    print(f"{a.delay_ms}ms ためて流します（ログ保存{'あり' if a.with_log else 'なし'}の接続先）", flush=True)
+    y, sr, log, masker, emitted = run_live(a.audio, a.delay_ms, cfg, Detectors(cfg.base), a.engine, a.with_log,
+                                           on_line=lambda ln: print(ln, flush=True), ahead=a.ahead)
+    audio.write_wav(out / f"{stem}.live{a.delay_ms}.wav", y, sr)
+    log.save(out / f"{stem}.stream.json")
+    write = {"delay_ms": a.delay_ms, "emitted": emitted,
+             "snapshots": [{"at_ms": h.at_ms, "intervals": h.intervals} for h in masker.history]}
+    (out / f"{stem}.live{a.delay_ms}.json").write_text(json.dumps(write, ensure_ascii=False), encoding="utf-8")
+    print(f"ピー音にした長さ {sum(e - s for s, e in emitted) / 1000:.1f}秒、書き出し先 {out}", flush=True)
+
+
+def cmd_live_eval(a):
+    """保存したイベントを届いた時刻どおりに流し直し、リアルタイムで伏せたときの漏れを測る。"""
+    from .asr import StreamLog
+    from .evaluate import trim_to_voice, write_json
+    from .live import score_live
+    from .mask import CONDITIONS, Detectors
+    from .synth import load_truths
+
+    items, cache, base = [], {}, Path(a.truth).parent
+    for t in load_truths(a.truth, a.variant):
+        p = Path(a.rec) / f"{t.key}.json"
+        if p.exists():
+            items.append((trim_to_voice(t, base, cache), StreamLog.load(p)))
+    cfg = CONDITIONS[a.condition]
+    rows = score_live(items, cfg, Detectors(cfg.base), [int(x) for x in a.delays.split(",")], ahead=a.ahead)
+    write_json({"本数": len(items), "先回り": a.ahead, "ためる時間ごと": rows}, Path(a.out) / "live.json")
+    for r in rows:
+        print(f"{r['ためる時間ms']:>6}ms 区間漏れ {r['区間漏れ率']:.1%} 消しすぎ {r['消しすぎ率']:.1%}（{r['件数']}件）", flush=True)
 
 
 def cmd_llm_export(a):
@@ -371,6 +428,8 @@ def main(argv: list[str] | None = None) -> None:
     s.add_argument("--limit", type=int, default=1)
     s.add_argument("--chunk-ms", type=int, default=100)
     s.add_argument("--profile-words", default=None)
+    s.add_argument("--start", type=int, default=0, help="何本目から流すか（100 なら call0100 から）")
+    s.add_argument("--with-log", action="store_true", help="ログ保存ありの接続先を使う（架空の台本だけに使う）")
 
     s = add("stream-eval", cmd_stream_eval, "ためる時間ごとの漏れ率")
     s.add_argument("--truth", required=True)
@@ -381,6 +440,25 @@ def main(argv: list[str] | None = None) -> None:
     s.add_argument("--threshold", type=float, default=0.6)
     s.add_argument("--delays", default="0,250,500,1000,1500,2000,3000,5000")
     s.add_argument("--simulate", action="store_true", help="同期HTTPの結果から到着時刻を仮に作る（オフライン確認用）")
+    s.add_argument("--partial", action="store_true", help="途中結果（U）に文字が出た時点で判断する")
+
+    s = add("live", cmd_live, "通話中にリアルタイムで伏せる（録音ファイルを実時間で流して試す）")
+    s.add_argument("audio")
+    s.add_argument("--delay-ms", type=int, default=1500)
+    s.add_argument("--out", default="masked/live")
+    s.add_argument("--engine", default="hybrid")
+    s.add_argument("--condition", default="C2")
+    s.add_argument("--with-log", action="store_true", help="ログ保存ありの接続先を使う（架空の台本だけに使う）")
+    s.add_argument("--ahead", action="store_true", help="質問のあとの発話を、文字が出る前から伏せておく")
+
+    s = add("live-eval", cmd_live_eval, "リアルタイムで伏せる処理を、保存したイベントで流し直して測る")
+    s.add_argument("--truth", required=True)
+    s.add_argument("--rec", required=True)
+    s.add_argument("--variant", default="clean")
+    s.add_argument("--out", required=True)
+    s.add_argument("--condition", default="C2")
+    s.add_argument("--delays", default="0,500,1000,1500,2000,3000,5000")
+    s.add_argument("--ahead", action="store_true", help="質問のあとの発話を、文字が出る前から伏せておく")
 
     s = add("llm-export", cmd_llm_export, "Claude Code に答えてもらう問いを書き出す（比較用）")
     s.add_argument("--truth", required=True)

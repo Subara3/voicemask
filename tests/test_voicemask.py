@@ -258,3 +258,17 @@ def test_bridge_silence_between_family_and_given_name():
     assert _bridge_silence([(0, 700), (1100, 1900)], toks, [True, True, False, False]) == [(0, 1900)]
     # あいだに伏せていない声があればつながない
     assert _bridge_silence([(0, 700), (2500, 2900)], toks, [True, True, False, True]) == [(0, 700), (2500, 2900)]
+
+
+def test_reveal_time_uses_first_partial_with_text():
+    from voicemask.stream_eval import reveal_time
+    parts = [(1000.0, "お名前は"), (1300.0, "お名前は佐"), (1400.0, "お名前は佐藤")]
+    assert reveal_time("佐藤", parts, 5000.0) == 1400.0
+    assert reveal_time("鈴木", parts, 5000.0) == 5000.0  # 途中結果に出なければ確定結果を待つ
+
+
+def test_emitted_intervals_only_uses_what_was_known_at_emit_time():
+    from voicemask.live import Snapshot, emitted_intervals
+    hist = [Snapshot(0, []), Snapshot(3000, [(1000, 2000)])]  # 1〜2秒の区間は3秒の時点で分かった
+    assert emitted_intervals(hist, 1000, 4000) == []            # 1秒遅れでは、もう流れたあと
+    assert emitted_intervals(hist, 2000, 4000) == [(1000, 2000)]  # 2秒遅れなら間に合う

@@ -67,6 +67,8 @@ def trim_to_voice(truth: CallTruth, base_dir, cache: dict | None = None) -> Call
     from dataclasses import replace
     from . import audio
 
+    if truth.voice_trimmed:
+        return truth
     key = truth.call_id
     if cache is not None and key in cache:
         env, sr_ms, thr = cache[key]
@@ -85,14 +87,14 @@ def trim_to_voice(truth: CallTruth, base_dir, cache: dict | None = None) -> Call
         on = np.nonzero(env[a:b] > thr)[0]
         if not len(on):
             return s, e
-        return max(s, (a + on[0]) * sr_ms - 50), min(e, (a + on[-1] + 1) * sr_ms + 50)  # 弱い子音のぶん50ms残す
+        return int(max(s, (a + on[0]) * sr_ms - 50)), int(min(e, (a + on[-1] + 1) * sr_ms + 50))  # 弱い子音のぶん50ms残す
 
     parts = []
     for p in truth.parts:
         s, e = trim(p["start_ms"], p["end_ms"])
         parts.append({**p, "start_ms": s, "end_ms": e})
     spans = [replace(sp, start_ms=a, end_ms=b) for sp in truth.spans for a, b in [trim(sp.start_ms, sp.end_ms)]]
-    return replace(truth, parts=parts, spans=spans)
+    return replace(truth, parts=parts, spans=spans, voice_trimmed=True)
 
 
 def speech_parts(truth: CallTruth) -> list[tuple[int, int, bool]]:

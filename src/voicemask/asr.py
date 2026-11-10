@@ -31,10 +31,12 @@ def engine_name(e: str) -> str:
 
 
 def make_settings(engine: str, profile_words: str | None = None, profile_id: str | None = None,
-                  codec: str | None = None, keep_filler: bool = False, confidence_level: float = 0.0):
+                  codec: str | None = None, keep_filler: bool = False, confidence_level: float = 0.0,
+                  logging_opt_out: bool = True):
+    """logging_opt_out=False（ログ保存ありの接続先）は、架空の台本だけを流す測定で無料枠を分けるときに使う。"""
     from amivoice import RecognitionSettings
 
-    kw = dict(grammar_file_names=engine_name(engine), confidence_level=confidence_level, logging_opt_out=True)
+    kw = dict(grammar_file_names=engine_name(engine), confidence_level=confidence_level, logging_opt_out=logging_opt_out)
     if profile_words:
         kw["profile_words"] = profile_words
     if profile_id:
@@ -215,8 +217,9 @@ class StreamLog:
         return [(e["arrived_ms"], e["data"]) for e in self.events if e["type"] == "final" and e.get("data")]
 
     def to_recognition(self) -> Recognition:
-        # WebSocket は発話区間ごとに結果が届くので区切り直さない
-        return results_to_recognition(self.audio_path, self.engine, [(0, d) for _, d in self.finals()], gap_ms=None)
+        # WebSocket の発話区間は、番号の途中で割れたり、質問と答えが1つにまとまったりする。
+        # 同期HTTPと同じく、単語のあいだの無音で区切り直す（いつ届いたかは segment_arrivals が発話区間ごとに持つ）
+        return results_to_recognition(self.audio_path, self.engine, [(0, d) for _, d in self.finals()])
 
     def save(self, path: str | Path) -> None:
         Path(path).parent.mkdir(parents=True, exist_ok=True)
@@ -227,8 +230,12 @@ class StreamLog:
         return cls(**json.loads(Path(path).read_text(encoding="utf-8")))
 
 
-def stream_file(path: str | Path, engine: str, chunk_ms: int = 100, realtime: bool = True, **settings_kw) -> StreamLog:
-    """音声を実時間で流し、各イベントが届いた時刻（送り始めからの経過ms）を記録する。"""
+def stream_file(path: str | Path, engine: str, chunk_ms: int = 100, realtime: bool = True, on_event=None,
+                on_begin=None, **settings_kw) -> StreamLog:
+    """音声を実時間で流し、各イベントが届いた時刻（送り始めからの経過ms）を記録する。
+
+    on_event(item) はイベントが届くたびに呼ぶ（リアルタイムで伏せるとき用）。on_begin(now) は送り始めに呼ぶ。
+    """
     from amivoice import AmiVoiceClient
 
     x, sr = audio.read_wav(path)
@@ -238,12 +245,45 @@ def stream_file(path: str | Path, engine: str, chunk_ms: int = 100, realtime: bo
     else:
         data, codec, bpm = audio.to_pcm16_bytes(x), {16000: "LSB16K", 8000: "LSB8K"}[sr], sr * 2 // 1000
     log = StreamLog(str(path), engine_name(engine), chunk_ms)
-    client = AmiVoiceClient(settings=make_settings(engine, codec=codec, **settings_kw))
+    client = AmiVoiceClient(settings=make_settings(engine, codec=codec, **settings_kw), connect_timeout=15000, receive_timeout=180000)
     t0 = [0.0]
 
     def now() -> float:
         return (time.perf_counter() - t0[0]) * 1000.0
 
+    import amivoice._stream as _st
+
+    raw_partials: list[tuple[float, str]] = []
+    cls = _st.StreamSession
+    orig = cls._handle_packet
+
+    def tap(self, packet: str):  # 公式ライブラリは U の中身を文字列だけにするので、生のパケットを残す
+        if packet.startswith("U "):
+            raw_partials.append((now(), packet[2:]))
+            if on_event:
+                try:
+                    on_event({"type": "partial_raw", "arrived_ms": raw_partials[-1][0], "data": json.loads(packet[2:])})
+                except ValueError:
+                    pass
+        return orig(self, packet)
+
+    cls._handle_packet = tap
+    try:
+        _run_stream(client, data, step_bytes=chunk_ms * bpm, bpm=bpm, realtime=realtime, log=log, now=now, t0=t0,
+                    on_event=on_event, on_begin=on_begin)
+    finally:
+        cls._handle_packet = orig
+    for arrived, payload in raw_partials:
+        try:
+            log.events.append({"type": "partial_raw", "arrived_ms": arrived, "data": json.loads(payload)})
+        except ValueError:
+            pass
+    log.events.sort(key=lambda e: e["arrived_ms"])
+    return log
+
+
+def _run_stream(client, data: bytes, step_bytes: int, bpm: int, realtime: bool, log: "StreamLog", now, t0,
+                on_event=None, on_begin=None) -> None:
     with client.stream() as session:
         def receive():
             for ev in session.events():
@@ -253,11 +293,15 @@ def stream_file(path: str | Path, engine: str, chunk_ms: int = 100, realtime: bo
                 elif ev.utterance is not None:
                     item["time"] = ev.utterance.time
                 log.events.append(item)
+                if on_event:
+                    on_event(item)
 
         t0[0] = time.perf_counter()
+        if on_begin:
+            on_begin(now)
         th = threading.Thread(target=receive, daemon=True)
         th.start()
-        step = chunk_ms * bpm
+        step = step_bytes
         for i in range(0, len(data), step):
             session.write(data[i:i + step])
             if realtime:
@@ -267,4 +311,3 @@ def stream_file(path: str | Path, engine: str, chunk_ms: int = 100, realtime: bo
         log.sent_done_ms = now()
         session.end(timeout=60)
         th.join(timeout=5)
-    return log

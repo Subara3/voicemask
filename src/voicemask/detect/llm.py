@@ -51,8 +51,16 @@ class LLMDetector:
         self.use_api = use_api
         self.missing = 0
 
+    def answer_dir(self) -> Path:
+        """答えはモデルごとに分けて残す（Haiku は最初に使った answer/ のまま）。"""
+        import os
+        from ..llm_client import DEFAULT_MODEL
+
+        model = os.environ.get("VOICEMASK_LLM_MODEL", DEFAULT_MODEL)
+        return self.root / ("answer" if model == DEFAULT_MODEL else f"answer_{model}")
+
     def detect(self, view: TokenView, masked: list[bool] | None = None) -> list[Detection]:
-        p = self.root / "answer" / f"{ask_key(view, masked)}.json"
+        p = self.answer_dir() / f"{ask_key(view, masked)}.json"
         if not p.exists() and self.use_api:
             from ..llm_client import ask
 

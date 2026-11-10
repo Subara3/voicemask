@@ -145,6 +145,7 @@ class CallTruth:
     spans: list[TruthSpan]
     parts: list[dict]            # 部品ごとの時刻（個人情報でない部品も含む）
     voices: dict = field(default_factory=dict)
+    voice_trimmed: bool = False  # 区間を声のある範囲に詰め済みか（公開用の正解は詰め済み。音声なしで採点できる）
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -154,6 +155,7 @@ class CallTruth:
         return cls(
             d["call_id"], d["audio_path"], d["duration_ms"], d["sample_rate"], d["variant"],
             d["scenario"], [TruthSpan(**s) for s in d["spans"]], d["parts"], d.get("voices", {}),
+            d.get("voice_trimmed", False),
         )
 
     @property
